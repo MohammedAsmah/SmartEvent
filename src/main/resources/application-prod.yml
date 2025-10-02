@@ -1,0 +1,7 @@
+spring:
+  datasource:
+    url: jdbc:mysql://prod-server:3306/smartevent
+    username: admin
+    password: strongsecret
+server:
+  port: 80
