@@ -1,6 +1,7 @@
 package com.SmartEvent.SmartEvent.Filters;
 
 import com.SmartEvent.SmartEvent.Security.JwtUtil;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,8 +12,10 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Collections;
 
 public class JwtAuthorizationFilter extends OncePerRequestFilter {
+
     private final JwtUtil jwtUtil;
 
     public JwtAuthorizationFilter(JwtUtil jwtUtil) {
@@ -20,28 +23,34 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
 
-        String header = request.getHeader("Authorization");
-        String token = null;
+        String authHeader = request.getHeader("Authorization");
 
-        if (header != null && header.startsWith("Bearer ")) {
-            token = header.substring(7); // remove "Bearer "
-            String username = jwtUtil.extractUsername(token);
-            String role = jwtUtil.extractRole(token);
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            System.out.println("🚫 No JWT token found in header");
+            chain.doFilter(request, response);
+            return;
+        }
 
-            if (username != null && jwtUtil.validateToken(token)) {
-                UsernamePasswordAuthenticationToken auth =
-                        new UsernamePasswordAuthenticationToken(username, null,
-                                java.util.List.of(() -> role));
-                auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        String token = authHeader.substring(7);
+        String username = jwtUtil.extractUsername(token);
+        System.out.println("🟢 Extracted username from token: " + username);
 
-                // put the authentication inside Spring Security context
-                SecurityContextHolder.getContext().setAuthentication(auth);
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            if (jwtUtil.validateToken(token)) {
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(username, null, Collections.emptyList());
+                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+                System.out.println("✅ Authentication set for user: " + username);
+            } else {
+                System.out.println("❌ Invalid token");
             }
         }
 
-        filterChain.doFilter(request, response);
+        chain.doFilter(request, response);
     }
+
 }

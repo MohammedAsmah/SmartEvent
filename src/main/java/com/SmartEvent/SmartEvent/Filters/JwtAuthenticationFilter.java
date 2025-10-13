@@ -31,7 +31,7 @@ public class  JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilt
             // Read JSON body → {"username":"simo","password":"1234"}
             Map<String, String> creds = new ObjectMapper().readValue(request.getInputStream(), Map.class);
 
-            String username = creds.get("username");
+            String username = creds.get("userName");
             String password = creds.get("password");
 
             // Create an authentication object → Spring will check with UserDetailsService
@@ -51,7 +51,7 @@ public class  JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilt
         String username = authResult.getName();
         String role = authResult.getAuthorities().iterator().next().getAuthority();
 
-        String token = jwtUtil.generateToken(username, role);
+        String token = jwtUtil.generateToken(username);
 
         // Send token as JSON response
         new ObjectMapper().writeValue(response.getOutputStream(), Map.of("token", token));
