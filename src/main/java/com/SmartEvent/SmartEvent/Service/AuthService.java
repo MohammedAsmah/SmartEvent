@@ -1,4 +1,5 @@
 package com.SmartEvent.SmartEvent.Service;
+import com.SmartEvent.SmartEvent.Exception.ForbiddenException;
 import com.SmartEvent.SmartEvent.Filters.SecurityConfig.*;
 
 import com.SmartEvent.SmartEvent.Dto.TokenResponseDto;
@@ -11,11 +12,15 @@ import com.SmartEvent.SmartEvent.Repository.UserRepository;
 import com.SmartEvent.SmartEvent.Security.JwtUtil;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import org.springframework.web.server.ResponseStatusException;
 import org.thymeleaf.context.Context;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
@@ -33,9 +38,12 @@ public class AuthService {
         this.emailService = emailService;
         this.tokenRepository = tokenRepository;
     }
-    public String Register(String firstName, String lastName, String email, String password, String userName, int PhoneNumber){
+    public ResponseEntity<Map> Register(String firstName, String lastName, String email, String password, String userName, int PhoneNumber){
         if(userRepository.findByUsername(userName) != null){
             throw new IllegalArgumentException("Username already taken!");
+        }
+        if(userRepository.findByEmail(email) != null){
+            throw new IllegalArgumentException("Email already taken!");
         }
         String encodedPassword = passwordEncoder.encode(password);
         User user=new User();
@@ -47,8 +55,7 @@ public class AuthService {
         user.setPhoneNumber(PhoneNumber);
         user.setRole("USER");
         userRepository.save(user);
-        return "user saved successfully!";
-    }
+        return ResponseEntity.ok(Map.of("message", "User saved successfully"));  }
     public TokenResponseDto Login(String username, String password){
         User user=userRepository.findByUsername(username);
         if(user==null || !passwordEncoder.matches(password, user.getPassword())){
@@ -59,25 +66,25 @@ public class AuthService {
                 TokenResponseDto tokenResponseDto=new TokenResponseDto();
                 tokenResponseDto.setToken(jwt);
                 tokenResponseDto.setRefreshToken(refreshToken);
-                Token usToken=tokenRepository.findByUsername(username);
-                if(usToken==null){
+                Token usToken=tokenRepository.findByUsername(username).orElse(new Token());
+                if(usToken.getUsername()== null){
             Token token=new Token();
             token.setAccessToken(jwt);
             token.setRefreshToken(refreshToken);
             token.setUsername(username);
-            token.setExpirationTime(jwtUtil.GetEXPIRATION_TIME());
+            token.setExpirationTime(jwtUtil.getExpirationTime());
             tokenRepository.save(token);}else {
                     usToken.setAccessToken(jwt);
                     usToken.setRefreshToken(refreshToken);
                     usToken.setUsername(username);
-                    usToken.setExpirationTime(jwtUtil.GetEXPIRATION_TIME());
+                    usToken.setExpirationTime(jwtUtil.getExpirationTime());
                     tokenRepository.save(usToken);
                 }
             System.out.println(username);
             return tokenResponseDto;
         }
     }
-    public String forgotPassword(String email) {
+    public ResponseEntity<Map> forgotPassword(String email) {
         User user = userRepository.findByEmail(email);
         if (user == null) {
             throw new IllegalArgumentException("Email not found!");
@@ -96,11 +103,27 @@ public class AuthService {
         // Send email
         emailService.sendEmailWithTemplate(email, "Password Reset Code", "password-reset",context);
 
-        return "Reset code sent to your email.";
+        return ResponseEntity.ok(Map.of("message", "a code with 4 digits sents to your email!"));
     }
-    public String resetPassword(String code, String newPassword) {
-        User user = userRepository.findByResetCode(code);
-        if (user == null || user.getResetCodeExpiry().isBefore(LocalDateTime.now())) {
+
+//    checking the code if corect
+    public ResponseEntity<Map> checkCode(String code) {
+        User user = userRepository.findByResetCode(code).orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Invalid or expired CODE"
+        ));
+        if (!(user == null)  && !(user.getResetCodeExpiry().isBefore(LocalDateTime.now())) ) {
+            return ResponseEntity.ok(Map.of("message", "YOU CODE IS VALID!"));
+        }
+        return ResponseEntity.badRequest().body(Map.of("message", "Invalid or expired code!"));
+    }
+
+    public ResponseEntity<Map> resetPassword(String code, String newPassword) {
+        User user = userRepository.findByResetCode(code).orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Invalid or expired CODE"
+        ));
+        if (user == null && user.getResetCodeExpiry().isBefore(LocalDateTime.now())) {
             throw new IllegalArgumentException("Invalid or expired code!");
         }
 
@@ -110,12 +133,16 @@ public class AuthService {
         user.setResetCodeExpiry(null);
         userRepository.save(user);
 
-        return "Password updated successfully!";
+        return ResponseEntity.ok().body(Map.of("message", "code updates successfully"));
     }
     public TokenResponseDto refreshToken(String refreshToken,String token) {
-        String username = jwtUtil.extractUsername(refreshToken);
-        User user = userRepository.findByUsername(jwtUtil.extractUsername(token));
-        Token storedToken=tokenRepository.findByUsername(username);
+        String tk = token.substring(7);
+        String username = jwtUtil.extractUsername(tk);
+        User user = userRepository.findByUsername(jwtUtil.extractUsername(tk));
+        Token storedToken=tokenRepository.findByUsername(username).orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Invalid or expired token"
+        ));
         if(storedToken != null){
         if(!storedToken.getRefreshToken().equals(refreshToken)){
             throw new IllegalArgumentException("Invalid refresh token!");
@@ -137,14 +164,32 @@ public class AuthService {
         TokenResponseDto tokenResponseDto=new TokenResponseDto();
         tokenResponseDto.setToken(newAccessToken);
         tokenResponseDto.setRefreshToken(refreshToken);
-        Token tokenUser=tokenRepository.findByUsername(username);
+        Token tokenUser=tokenRepository.findByUsername(username).orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Invalid or expired token"
+        ));
         tokenUser.setAccessToken(newAccessToken);
         tokenRepository.save(tokenUser);
         return tokenResponseDto;
     }
-    public String LogOut(String token, String refreshToken) {
-        tokenRepository.deleteByUsername(jwtUtil.extractUsername(token));
-        return "Logged out successfully!";
+    public ResponseEntity<String> ckeckToken(String token) {
+        String tk = token.substring(7);
+        Token ustoken=tokenRepository.findByUsername(jwtUtil.extractUsername(tk)).orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Invalid or expired token"
+        ));
+        if(ustoken.getAccessToken().equals(tk)){
+            if(jwtUtil.validateToken(tk)){
+                return ResponseEntity.ok("token is valid");
+            }
+        }
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
-
+    public ResponseEntity<String> LogOut(String token, String refreshToken) {
+        String tk = token.substring(7);
+        if(tokenRepository.deleteByUsername(jwtUtil.extractUsername(tk))>0){
+            return ResponseEntity.ok("Log out successfully.");
+        }
+        return ResponseEntity.ok("Log out failed.");
+    }
 }

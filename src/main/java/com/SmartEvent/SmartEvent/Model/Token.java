@@ -11,12 +11,12 @@ public class Token {
     private String username;
     private String accessToken;
     private String refreshToken;
-    private String expirationTime;
+    private Long expirationTime;
 
     // Constructors
     public Token() {}
 
-    public Token(String username, String accessToken, String refreshToken, String expirationTime) {
+    public Token(String username, String accessToken, String refreshToken, Long expirationTime) {
         this.username = username;
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;
@@ -46,10 +46,10 @@ public class Token {
     public void setRefreshToken(String refreshToken) {
         this.refreshToken = refreshToken;
     }
-    public String getExpirationTime() {
+    public Long getExpirationTime() {
         return expirationTime;
     }
-    public void setExpirationTime(String expirationTime) {
+    public void setExpirationTime(Long expirationTime) {
         this.expirationTime = expirationTime;
     }
 }

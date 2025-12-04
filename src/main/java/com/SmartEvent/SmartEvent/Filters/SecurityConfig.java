@@ -1,5 +1,6 @@
 package com.SmartEvent.SmartEvent.Filters;
 
+import com.SmartEvent.SmartEvent.Repository.TokenRepository;
 import com.SmartEvent.SmartEvent.Service.CustomUserDetailsService;
 import com.SmartEvent.SmartEvent.Security.JwtUtil;
 import org.springframework.context.annotation.Bean;
@@ -13,17 +14,23 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
 public class SecurityConfig {
     private final JwtUtil jwtUtil;
     private final AuthenticationConfiguration authenticationConfiguration;
     private final CustomUserDetailsService customUserDetailsService;
+    private final TokenRepository tokenRepository;
 
-    public SecurityConfig(JwtUtil jwtUtil, AuthenticationConfiguration authenticationConfiguration, CustomUserDetailsService customUserDetailsService) {
+    public SecurityConfig(JwtUtil jwtUtil, AuthenticationConfiguration authenticationConfiguration, CustomUserDetailsService customUserDetailsService, TokenRepository tokenRepository) {
         this.jwtUtil = jwtUtil;
         this.authenticationConfiguration = authenticationConfiguration;
         this.customUserDetailsService = customUserDetailsService;
+        this.tokenRepository = tokenRepository;
 
     }
     @Bean
@@ -46,11 +53,15 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         JwtAuthenticationFilter authFilter = new JwtAuthenticationFilter(authenticationManager(), jwtUtil);
-        JwtAuthorizationFilter authorizationFilter = new JwtAuthorizationFilter(jwtUtil);
+        JwtAuthorizationFilter authorizationFilter = new JwtAuthorizationFilter(jwtUtil,tokenRepository);
 
-        return http.csrf(csrf -> csrf.disable())
+        return http.cors(withDefaults()).
+                csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/auth/**", "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs.yaml","/uploads/**").permitAll()
                         .requestMatchers("/admin/**").hasAuthority("ROLE_ADMIN")
                         .anyRequest().authenticated()
                 )
@@ -58,5 +69,18 @@ public class SecurityConfig {
                 .addFilterBefore(authorizationFilter, UsernamePasswordAuthenticationFilter.class)
 
                 .build();
+    }
+    @Bean
+    public WebMvcConfigurer corsConfigurer() {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addCorsMappings(CorsRegistry registry) {
+                registry.addMapping("/**")
+                        .allowedOrigins("http://localhost:4200")
+                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                        .allowedHeaders("*")
+                        .allowCredentials(true);
+            }
+        };
     }
 }

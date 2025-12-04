@@ -21,13 +21,19 @@ public class LoginController {
         return authService.Login(request.getUsername(), request.getPassword());
     }
 
-    @PostMapping("refresh-token/")
-    public ResponseEntity<TokenResponseDto> refreshToken(@RequestHeader("Refresh-Token") String refreshToken,@RequestHeader("token") String token) {
+    @GetMapping("refresh-token/")
+    public ResponseEntity<TokenResponseDto> refreshToken(@RequestHeader("Refresh-Token") String refreshToken,@RequestHeader("Authorization") String token) {
         TokenResponseDto newTokens = authService.refreshToken(refreshToken,token);
         return ResponseEntity.ok(newTokens);
     }
+
+    @GetMapping("ckeck-token/")
+    public ResponseEntity<String> ckeckToken(@RequestHeader("Authorization") String token) {
+        return authService.ckeckToken(token);
+    }
+
     @PostMapping("logout/")
-    public String logout(@RequestHeader("Refresh-Token") String refreshToken,@RequestHeader("token") String token) {
+    public ResponseEntity<String> logout(@RequestHeader("Refresh-Token") String refreshToken, @RequestHeader("Authorization") String token) {
         return authService.LogOut(token, refreshToken);
     }
 }

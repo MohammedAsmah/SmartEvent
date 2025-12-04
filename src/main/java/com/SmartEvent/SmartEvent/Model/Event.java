@@ -29,11 +29,11 @@ public class Event {
     private String titre;
 
     // Reference to EventType document
-    @DBRef
+    //@DBRef
     @NotNull(message = "Le type d'événement est obligatoire")
     private EventType type;
 
-    @NotNull(message = "Le statut est obligatoire")
+    //@NotNull(message = "Le statut est obligatoire")
     private EventStatus status;
 
     @NotBlank(message = "La description est obligatoire")

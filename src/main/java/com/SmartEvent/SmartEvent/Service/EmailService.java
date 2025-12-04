@@ -55,4 +55,35 @@ public class EmailService {
             e.printStackTrace();
         }
     }
+    // ✅ Method to send an HTML email with a QR code image
+    public void sendEmailWithTemplateAndQr(
+            String to,
+            String subject,
+            String templateName,
+            Context context,
+            String qrPath
+    ) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true); // true => multipart
+
+            // Generate the HTML content using Thymeleaf
+            String htmlContent = templateEngine.process(templateName, context);
+
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
+
+            // Attach the QR code inline so it can show in HTML
+            if (qrPath != null) {
+                helper.addInline("qrcodeImage", new java.io.File(qrPath)); // "qrcodeImage" is the name used in the HTML
+            }
+
+            mailSender.send(message);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to send invitation email", e);
+        }
+    }
+
 }

@@ -3,6 +3,7 @@ package com.SmartEvent.SmartEvent.Controller;
 
 import com.SmartEvent.SmartEvent.Enums.EventStatus;
 import com.SmartEvent.SmartEvent.Model.Event;
+import com.SmartEvent.SmartEvent.Model.EventType;
 import com.SmartEvent.SmartEvent.Service.EventService;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -14,10 +15,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/events")
@@ -29,13 +29,15 @@ public class EventController {
         this.eventService = eventService;
     }
 
-    @PostMapping(consumes = {"multipart/form-data"})
+    @PostMapping(consumes = {"multipart/form-data","application/json"})
     public ResponseEntity<Event> createEvent(
             @RequestPart("event") @Valid Event event,
-            @RequestPart(value = "images", required = false) MultipartFile[] images
+            @RequestPart(value = "images", required = false) MultipartFile[] images,
+            @RequestPart(value = "logo", required = false) MultipartFile logo,
+            @RequestPart(value = "couverture", required = false) MultipartFile couverture
     ) {
         List<MultipartFile> imgs = (images == null) ? null : Arrays.asList(images);
-        Event saved = eventService.createEventWithImages(event, imgs);
+        Event saved = eventService.createEventWithImages(event, imgs,logo, couverture);
         return ResponseEntity.ok(saved);
     }
     @GetMapping("/{id}")
@@ -81,21 +83,33 @@ public class EventController {
     @GetMapping
     public ResponseEntity<Page<Event>> getEvents(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "5") int size
+            @RequestParam(defaultValue = "10") int size
     ) {
         Page<Event> events = eventService.getEvents(page, size);
         return ResponseEntity.ok(events);
     }
     @GetMapping("/filter")
-    public ResponseEntity<List<Event>> filterEvents(
+    public ResponseEntity<Page<Event>> filterEvents(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) EventStatus status,
-            @RequestParam(required = false) String localisation,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end
+            @RequestParam(required = false) EventType type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDate start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDate end
     ) {
-        List<Event> events = eventService.filterEvents(status, localisation, start, end);
+        Page<Event> events = eventService.filterEvents(page,size,status, type, start, end);
         return ResponseEntity.ok(events);
     }
+
+    @GetMapping("/create")
+    public ResponseEntity<Map<String,Object>> get_create(){
+        Map<String,Object> map = new HashMap<>();
+        map.put("eventStatus",EventStatus.values());
+        map.put("eventsType",EventType.values());
+        return ResponseEntity.ok(map);
+    }
+
+
     @PostMapping("/archive-past")
     public ResponseEntity<String> archivePastEvents() {
         eventService.archivePastEvents();

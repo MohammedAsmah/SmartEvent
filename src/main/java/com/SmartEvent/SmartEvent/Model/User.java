@@ -3,6 +3,9 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -13,25 +16,18 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
-@Document
-public class User implements UserDetails {
-    @Id
-    private String _id;
-    @NotBlank(message = "firstname is requered")
-    private String firstName;
-    @NotBlank(message = "lastname is requered")
-    private String lastName;
-    @NotBlank(message = "email is requered")
-    @Email(message = "please orivide a valid email")
-    @Indexed(unique = true)
-    private String email;
+
+@NoArgsConstructor
+ @Data
+@Document(collection = "users")
+public class User extends Person implements UserDetails {
     @NotBlank(message = "password is requered")
     @Size(min = 8, max = 20, message = "Password must be between 8 and 20 characters")
     private String password;
     @NotBlank(message = "username is requered")
     @Indexed(unique = true)
     private String username;
-    @NotNull(message = "phone number is requered")
+    @NotNull
     private int PhoneNumber;
     private String photo;
     private boolean Status=true;
@@ -41,9 +37,7 @@ public class User implements UserDetails {
     private LocalDateTime resetCodeExpiry;
 
     public User(String firstName, String lastName, String email, String password, String userName, int PhoneNumber,String photo, String role) {
-        this.firstName = firstName;
-        this.lastName = lastName;
-        this.email = email;
+        super(firstName,lastName,email);
         this.password = password;
         this.username = userName;
         this.PhoneNumber = PhoneNumber;
@@ -52,22 +46,8 @@ public class User implements UserDetails {
         this.Status = true;
     }
 
-    public User() {
 
-    }
 
-    public String getId() {
-        return _id;
-    }
-    public String getFirstName() {
-        return firstName;
-    }
-    public String getLastName() {
-        return lastName;
-    }
-    public String getEmail() {
-        return email;
-    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -93,9 +73,6 @@ public class User implements UserDetails {
         return resetCodeExpiry;
     }
 
-    public void setEmail(String email) {
-        this.email = email;
-    }
     public void setPassword(String password) {
         this.password = password;
     }
@@ -105,12 +82,7 @@ public class User implements UserDetails {
     public void setPhoneNumber(int PhoneNumber) {
         this.PhoneNumber = PhoneNumber;
     }
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
+
     public void setResetCode(String resetCode) {
         this.resetCode = resetCode;
     }
@@ -131,7 +103,10 @@ public class User implements UserDetails {
     }
 
     public void setId(String id) {
-        this._id = id;
+        super.set_id(id) ;
+    }
+    public String getId() {
+        return super.get_id();
     }
     public void setStatus(boolean status) {
         this.Status = status;

@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
 @Document(collection = "invites")
-public class Invite {
+public class Invite  {
 
     @Id
     private String id;

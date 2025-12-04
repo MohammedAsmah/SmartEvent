@@ -3,15 +3,25 @@ package com.SmartEvent.SmartEvent.Service;
 
 import com.SmartEvent.SmartEvent.Enums.EventStatus;
 import com.SmartEvent.SmartEvent.Model.Event;
+import com.SmartEvent.SmartEvent.Model.EventType;
 import com.SmartEvent.SmartEvent.Model.Image;
 import com.SmartEvent.SmartEvent.Repository.EventRepository;
 import com.SmartEvent.SmartEvent.Repository.ImageRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+
 
 import jakarta.annotation.PostConstruct;
 import java.io.File;
@@ -58,34 +68,37 @@ public class EventService {
      *   3) Create Image docs, save them, collect their ids.
      *   4) Update the event with imageIds and save it.
      */
-    public Event createEventWithImages(Event event, List<MultipartFile> images) {
-        // Basic validation example: ensure date order (if your Event uses LocalDate/LocalDateTime)
+    public Event createEventWithImages(Event event,
+                                       List<MultipartFile> images,
+                                       MultipartFile logoFile,
+                                       MultipartFile couvertureFile) {
+
+        // --- 1) Validate dates ---
         if (event.getStartDate() != null && event.getEndDate() != null) {
             if (event.getEndDate().isBefore(event.getStartDate())) {
                 throw new IllegalArgumentException("endDate must be after startDate");
             }
         }
-        LocalDate today = LocalDate.now();
 
+        LocalDate today = LocalDate.now();
         if (event.getStartDate() != null && event.getEndDate() != null) {
             if (today.isBefore(event.getStartDate().toLocalDate())) {
                 event.setStatus(EventStatus.UPCOMING);
             } else if (today.isAfter(event.getEndDate().toLocalDate())) {
                 event.setStatus(EventStatus.COMPLETED);
             } else {
-                // today is between startDate and endDate
                 event.setStatus(EventStatus.ONGOING);
             }
         } else {
-            // If dates are not provided, set default status
             event.setStatus(EventStatus.DRAFT);
         }
 
-        // 1) Save event first to generate id
-        event.setImageIds(new ArrayList<>()); // ensure not null
+        // --- 2) Save event first to generate ID ---
+        event.setImageIds(new ArrayList<>());
+        event.setType(EventType.CONFERENCE);
         Event saved = eventRepository.save(event);
 
-        // 2) prepare event upload dir
+        // --- 3) Prepare event upload directory ---
         Path eventDir = Paths.get(baseUploadDir, saved.getId());
         try {
             Files.createDirectories(eventDir);
@@ -93,39 +106,61 @@ public class EventService {
             throw new RuntimeException("Could not create event directory: " + eventDir.toString(), e);
         }
 
-        // 3) process images
+        // --- 4) Save logo ---
+        if (logoFile != null && !logoFile.isEmpty()) {
+            String logoFilename = saved.getId() + "_logo_" + Instant.now().toEpochMilli() + "_" +
+                    Paths.get(logoFile.getOriginalFilename()).getFileName().toString();
+            Path target = eventDir.resolve(logoFilename);
+            try {
+                Files.copy(logoFile.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+                saved.setLogo("/" + baseUploadDir + "/" + saved.getId() + "/" + logoFilename);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to store logo file", e);
+            }
+        }
+
+        // --- 5) Save couverture (cover) ---
+        if (couvertureFile != null && !couvertureFile.isEmpty()) {
+            String coverFilename = saved.getId() + "_cover_" + Instant.now().toEpochMilli() + "_" +
+                    Paths.get(couvertureFile.getOriginalFilename()).getFileName().toString();
+            Path target = eventDir.resolve(coverFilename);
+            try {
+                Files.copy(couvertureFile.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+                saved.setCouverture("/" + baseUploadDir + "/" + saved.getId() + "/" + coverFilename);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to store couverture file", e);
+            }
+        }
+
+        // --- 6) Save other images ---
         if (images != null) {
             List<String> imageIds = new ArrayList<>();
             for (MultipartFile file : images) {
                 if (file == null || file.isEmpty()) continue;
 
-                // sanitize filename (very basic)
                 String original = Paths.get(file.getOriginalFilename()).getFileName().toString();
                 String filename = saved.getId() + "_" + Instant.now().toEpochMilli() + "_" + original;
                 Path target = eventDir.resolve(filename);
 
                 try {
-                    // copy file to disk
                     Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
 
-                    // create image document (url stores relative path; adapt as needed)
                     Image image = new Image();
-                    image.setUrl("/" + baseUploadDir + "/" + saved.getId() + "/" + filename); // or store absolute path
+                    image.setUrl("/" + baseUploadDir + "/" + saved.getId() + "/" + filename);
                     image.setEventId(saved.getId());
                     image.setDescription(null);
 
                     Image savedImage = imageRepository.save(image);
                     imageIds.add(savedImage.getId());
                 } catch (IOException e) {
-                    // if one image fails, we continue but log/throw depending on your needs
                     throw new RuntimeException("Failed to store file " + original, e);
                 }
             }
-
-            // 4) update event with image ids and save
             saved.setImageIds(imageIds);
-            saved = eventRepository.save(saved);
         }
+
+        // --- 7) Final save ---
+        saved = eventRepository.save(saved);
 
         return saved;
     }
@@ -187,20 +222,42 @@ public class EventService {
         Pageable pageable = PageRequest.of(page, size);
         return eventRepository.findAll(pageable);
     }
-    public List<Event> filterEvents(EventStatus status, String localisation, LocalDateTime start, LocalDateTime end) {
-        // Start with all events
-        List<Event> allEvents = eventRepository.findAll();
+    @Autowired
+    private MongoTemplate mongoTemplate;
 
-        return allEvents.stream()
-                .filter(e -> status == null || e.getStatus() == status)
-                .filter(e -> localisation == null || e.getLocalisation().toLowerCase().contains(localisation.toLowerCase()))
-                .filter(e -> {
-                    if (start != null && end != null) {
-                        return !e.getStartDate().isBefore(start) && !e.getEndDate().isAfter(end);
-                    }
-                    return true;
-                })
-                .collect(Collectors.toList());
+    public Page<Event> filterEvents(int page,int size,
+                                    EventStatus status,
+                                    EventType type,
+                                    LocalDate start,
+                                    LocalDate end) {
+
+        Pageable pageable = PageRequest.of(page, size);
+        Query query = new Query().with(pageable);
+
+        if (status != null) {
+            query.addCriteria(Criteria.where("status").is(status));
+        }
+
+        if (type != null) {
+            query.addCriteria(Criteria.where("type").is(type));
+        }
+
+        if (start != null) {
+            query.addCriteria(
+                    Criteria.where("startDate").gte(start.atStartOfDay())
+
+            );
+        }
+        if (end != null) {
+            query.addCriteria(
+                    Criteria.where("endDate").lte(end.atTime(23,59,59))
+            );
+        }
+
+        List<Event> events = mongoTemplate.find(query, Event.class);
+        long total = mongoTemplate.count(Query.of(query).limit(-1).skip(-1), Event.class);
+
+        return new PageImpl<>(events, pageable, total);
     }
     public void archivePastEvents() {
         LocalDate today = LocalDate.now();

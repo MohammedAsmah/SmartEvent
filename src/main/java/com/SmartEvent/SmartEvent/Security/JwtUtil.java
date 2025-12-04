@@ -3,7 +3,7 @@ package com.SmartEvent.SmartEvent.Security;
 import com.SmartEvent.SmartEvent.Model.User;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
@@ -11,8 +11,15 @@ import java.security.Key;
 
 @Component
 public class JwtUtil {
-    private final String SECRET = "mysupersecuresecretkeyofatleast32chars123!"; // use at least 32 chars
-    private final long EXPIRATION_TIME = 1000 * 60 * 60; // 1h
+
+    @Value("${jwt.secret}")
+    private String SECRET;
+
+    @Value("${jwt.expiration:3600000}") // 1 hour default
+    private long EXPIRATION_TIME;
+
+    @Value("${jwt.refresh-expiration:604800000}") // 7 days default
+    private long REFRESH_EXPIRATION_TIME;
 
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(SECRET.getBytes());
@@ -26,11 +33,12 @@ public class JwtUtil {
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
+
     public String generateRefreshToken(User user) {
         return Jwts.builder()
                 .setSubject(user.getUsername())
-                .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 7)) // 7 days
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + REFRESH_EXPIRATION_TIME))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -46,31 +54,89 @@ public class JwtUtil {
 
             System.out.println("🟢 Extracted username: " + username);
             return username;
+        } catch (ExpiredJwtException e) {
+            System.out.println("🔴 Token expired: " + e.getMessage());
+            return null;
         } catch (Exception e) {
             System.out.println("🔴 Failed to extract username: " + e.getMessage());
             return null;
         }
     }
 
-
     public boolean validateToken(String token) {
         try {
-            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token);
+            Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token);
             return true;
-        } catch (JwtException e) {
+        } catch (ExpiredJwtException e) {
+            System.out.println("🔴 Token expired");
+            return false;
+        } catch (MalformedJwtException e) {
+            System.out.println("🔴 Malformed token");
+            return false;
+        } catch (SecurityException | SignatureException e) {
+            System.out.println("🔴 Invalid signature");
+            return false;
+        } catch (Exception e) {
+            System.out.println("🔴 Token validation failed: " + e.getMessage());
             return false;
         }
     }
 
-    public String extractRole(String token) {
+    public boolean isTokenExpired(String token) {
+        try {
+            Date expiration = Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody()
+                    .getExpiration();
+            return expiration.before(new Date());
+        } catch (ExpiredJwtException e) {
+            return true;
+        } catch (Exception e) {
+            return true;
+        }
+    }
 
-        return token;
+    // Extract claims for additional info
+    public Claims extractAllClaims(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
     }
-    public String GetEXPIRATION_TIME(){
-        return String.valueOf(EXPIRATION_TIME+"second");
+
+    public long getExpirationTime() {
+        return EXPIRATION_TIME;
     }
-    public String getSECRET() {
+
+    public long getRefreshExpirationTime() {
+        return REFRESH_EXPIRATION_TIME;
+    }
+    public String getSECRET(){
         return SECRET;
     }
 
+    // Remove or fix this method - it currently just returns the token
+    // If you want to extract roles, add them to the token first:
+    /*
+    public String generateTokenWithRole(String username, String role) {
+        return Jwts.builder()
+                .setSubject(username)
+                .claim("role", role)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String extractRole(String token) {
+        Claims claims = extractAllClaims(token);
+        return claims.get("role", String.class);
+    }
+    */
 }

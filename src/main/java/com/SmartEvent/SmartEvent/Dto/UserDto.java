@@ -2,6 +2,7 @@ package com.SmartEvent.SmartEvent.Dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.data.mongodb.core.index.Indexed;
 
@@ -21,7 +22,7 @@ public class UserDto {
     @NotBlank(message = "username is requered")
     @Indexed(unique = true)
     private String userName;
-    @NotBlank(message = "phone number is requered")
+    @NotNull
     private int PhoneNumber;
     private String role;
     private String photo;

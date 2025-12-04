@@ -2,6 +2,9 @@ package com.SmartEvent.SmartEvent.Repository;
 
 import com.SmartEvent.SmartEvent.Enums.EventStatus;
 import com.SmartEvent.SmartEvent.Model.Event;
+import com.SmartEvent.SmartEvent.Model.EventType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 
@@ -10,7 +13,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface EventRepository extends MongoRepository<Event, String> {
-    Event findByTitle(String title);
+    Event findByTitre(String titre);
     List<Event> findByStatus(EventStatus status);
 
     // Filter by localisation (contains)

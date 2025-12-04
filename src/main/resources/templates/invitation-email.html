@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Invitation</title>
+</head>
+<body style="font-family: Arial, sans-serif; color: #333;">
+<h2 th:text="'You are invited to: ' + ${eventTitle}"></h2>
+<p><strong>Location:</strong> <span th:text="${location}"></span></p>
+<p><strong>Date:</strong> <span th:text="${date}"></span></p>
+<p><strong>Status:</strong> <span th:text="${status}"></span></p>
+
+<p>Please present this QR code when you arrive:</p>
+<img src="cid:qrcodeImage" alt="QR Code" style="width:200px; height:200px;"/>
+
+<br><br>
+<p>Click below to confirm your attendance:</p>
+<a th:href="${confirmationUrl}"
+   style="background-color:#4CAF50; color:white; padding:10px 20px; text-decoration:none; border-radius:5px;">
+    Confirm Attendance
+</a>
+
+<p>If you can't attend, ignore this message.</p>
+</body>
+</html>
