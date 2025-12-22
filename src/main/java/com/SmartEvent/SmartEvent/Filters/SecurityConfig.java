@@ -58,7 +58,7 @@ public class SecurityConfig {
         return http.cors(withDefaults()).
                 csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**", "/v3/api-docs/**",
+                        .requestMatchers("/auth/**","/public/**", "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/v3/api-docs.yaml","/uploads/**").permitAll()

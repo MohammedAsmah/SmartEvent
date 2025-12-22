@@ -2,6 +2,7 @@ package com.SmartEvent.SmartEvent.Service;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -61,7 +62,7 @@ public class EmailService {
             String subject,
             String templateName,
             Context context,
-            String qrPath
+            String logoPath
     ) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -74,9 +75,9 @@ public class EmailService {
             helper.setSubject(subject);
             helper.setText(htmlContent, true);
 
-            // Attach the QR code inline so it can show in HTML
-            if (qrPath != null) {
-                helper.addInline("qrcodeImage", new java.io.File(qrPath)); // "qrcodeImage" is the name used in the HTML
+            if (logoPath != null) {
+                String cleanPath = logoPath.startsWith("/") ? logoPath.substring(1) : logoPath;
+                helper.addInline("logo", new java.io.File(cleanPath)); // "qrcodeImage" is the name used in the HTML
             }
 
             mailSender.send(message);

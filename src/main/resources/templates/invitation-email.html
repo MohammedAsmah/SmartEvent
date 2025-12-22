@@ -2,24 +2,69 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>Invitation</title>
+    <title>Event Invitation</title>
 </head>
-<body style="font-family: Arial, sans-serif; color: #333;">
-<h2 th:text="'You are invited to: ' + ${eventTitle}"></h2>
-<p><strong>Location:</strong> <span th:text="${location}"></span></p>
-<p><strong>Date:</strong> <span th:text="${date}"></span></p>
-<p><strong>Status:</strong> <span th:text="${status}"></span></p>
 
-<p>Please present this QR code when you arrive:</p>
-<img src="cid:qrcodeImage" alt="QR Code" style="width:200px; height:200px;"/>
+<body style="margin:0; padding:0; background:#f5f7fa; font-family:Arial, sans-serif;">
 
-<br><br>
-<p>Click below to confirm your attendance:</p>
-<a th:href="${confirmationUrl}"
-   style="background-color:#4CAF50; color:white; padding:10px 20px; text-decoration:none; border-radius:5px;">
-    Confirm Attendance
-</a>
+<!-- Main container -->
+<div style="max-width:600px; margin:40px auto; background:white; padding:25px; border-radius:12px;
+            box-shadow:0 4px 15px rgba(0,0,0,0.1);">
 
-<p>If you can't attend, ignore this message.</p>
+    <!-- Header -->
+    <div style="text-align:center; padding-bottom:20px; border-bottom:1px solid #eee;">
+        <img src="cid:logo" alt="Event Logo"
+             style="width:120px; height:120px; border-radius:50%; object-fit:cover; margin-bottom:10px;"/>
+
+        <h2 style="color:#2b2d42; margin:10px 0; font-size:26px;"
+            th:text="${eventTitle}"></h2>
+
+        <p style="color:#6c757d; font-size:14px; margin:0;">
+            Hi <span th:text="${inviteName }" ></span> You are officially invited to our event 🎉
+        </p>
+    </div>
+
+    <!-- Body content -->
+    <div style="padding:20px; font-size:15px; color:#333; line-height:1.6;">
+
+        <h3 style="color:#2b2d42;">📌 Event Details</h3>
+
+        <p><strong>Description:</strong> <span th:text="${description}"></span></p>
+
+        <p>
+            <strong>Location:</strong>
+            <a th:href="'https://www.google.com/maps?q='+${locationLat}+','+${locationLng}"
+               style="color:#1d72b8; text-decoration:none;" target="_blank">
+                View on Google Maps
+            </a>
+        </p>
+
+        <p><strong>Date:</strong> <span th:text="${date}"></span></p>
+        <p><strong>Type:</strong> <span th:text="${type}"></span></p>
+
+
+        <div style="text-align:center; margin-top:25px;">
+            <a th:href="${confirmationUrl}"
+               style="background:#28a745; color:white; padding:12px 22px; text-decoration:none;
+                      border-radius:8px; margin-right:10px; display:inline-block; font-weight:bold;">
+                ✔ Confirm Attendance
+            </a>
+
+            <a th:href="${disconfermationUrl}"
+               style="background:#d9534f; color:white; padding:12px 22px; text-decoration:none;
+                      border-radius:8px; display:inline-block; font-weight:bold;">
+                ✖ Refuse
+            </a>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="text-align:center; color:#999; font-size:12px; margin-top:20px;">
+        SmartEvent • This is an automated message, please do not reply.
+    </div>
+
+</div>
+
 </body>
 </html>

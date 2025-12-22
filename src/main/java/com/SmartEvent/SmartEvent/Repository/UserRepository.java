@@ -12,7 +12,7 @@ import java.util.Optional;
 public interface UserRepository extends MongoRepository<User, String> {
     // You can add custom queries here
     User findByUsername(String username);
-    User findByEmail(String email);
+    Optional<User> findByEmail(String email);
     Optional<User> findByResetCode(String resetCode);
     Page<User> findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(
             String username, String email, Pageable pageable);

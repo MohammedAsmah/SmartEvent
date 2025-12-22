@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -169,21 +170,170 @@ public class EventService {
         return eventRepository.findById(id);
     }
 
-    public Event updateEvent(String id, Event update) {
+    public Event updateEventWithImages(String id,
+                                       Event update,
+                                       List<MultipartFile> images,
+                                       MultipartFile logoFile,
+                                       MultipartFile couvertureFile,
+                                       Boolean clearExistingImages,
+                                       Boolean logoChanged,
+                                       Boolean convertureChanged) {
+
+        // --- 1) Find existing event ---
         Event exist = eventRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Event not found"));
-        // update fields you allow
-        exist.setTitre(update.getTitre());
-        exist.setType(update.getType());
-        exist.setStatus(update.getStatus());
-        exist.setDescription(update.getDescription());
-        exist.setStartDate(update.getStartDate());
-        exist.setEndDate(update.getEndDate());
-        exist.setLocalisation(update.getLocalisation());
-        exist.setCouverture(update.getCouverture());
-        exist.setLogo(update.getLogo());
-        // do not override imageIds here unless intended
+
+        // --- 2) Validate dates ---
+        LocalDateTime startDate = update.getStartDate() != null ? update.getStartDate() : exist.getStartDate();
+        LocalDateTime endDate = update.getEndDate() != null ? update.getEndDate() : exist.getEndDate();
+
+        if (startDate != null && endDate != null) {
+            if (endDate.isBefore(startDate)) {
+                throw new IllegalArgumentException("endDate must be after startDate");
+            }
+        }
+
+        // --- 3) Update basic fields ---
+        if (update.getTitre() != null) exist.setTitre(update.getTitre());
+        if (update.getType() != null) exist.setType(update.getType());
+        if (update.getDescription() != null) exist.setDescription(update.getDescription());
+        if (update.getStartDate() != null) exist.setStartDate(update.getStartDate());
+        if (update.getEndDate() != null) exist.setEndDate(update.getEndDate());
+        if (update.getLocalisation() != null) exist.setLocalisation(update.getLocalisation());
+
+        // --- 4) Update status based on dates ---
+        LocalDate today = LocalDate.now();
+        if (startDate != null && endDate != null) {
+            if (today.isBefore(startDate.toLocalDate())) {
+                exist.setStatus(EventStatus.UPCOMING);
+            } else if (today.isAfter(endDate.toLocalDate())) {
+                exist.setStatus(EventStatus.COMPLETED);
+            } else {
+                exist.setStatus(EventStatus.ONGOING);
+            }
+        } else if (update.getStatus() != null) {
+            exist.setStatus(update.getStatus());
+        }
+
+        // --- 5) Prepare event upload directory ---
+        Path eventDir = Paths.get(baseUploadDir, id);
+        try {
+            Files.createDirectories(eventDir);
+        } catch (IOException e) {
+            throw new RuntimeException("Could not create event directory: " + eventDir.toString(), e);
+        }
+
+        if(logoChanged){
+        // --- 6) Update logo ---
+        if (logoFile != null && !logoFile.isEmpty()) {
+            // Delete old logo file if exists
+            if (exist.getLogo() != null) {
+                deleteFileIfExists(exist.getLogo());
+            }
+
+            String logoFilename = id + "_logo_" + Instant.now().toEpochMilli() + "_" +
+                    Paths.get(logoFile.getOriginalFilename()).getFileName().toString();
+            Path target = eventDir.resolve(logoFilename);
+            try {
+                Files.copy(logoFile.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+                exist.setLogo("/" + baseUploadDir + "/" + id + "/" + logoFilename);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to store logo file", e);
+            }
+        }else{
+            if (exist.getLogo() != null) {
+                deleteFileIfExists(exist.getLogo());
+                exist.setLogo(null);
+            }
+        }}
+
+        // --- 7) Update couverture (cover) ---
+        if(convertureChanged){
+        if (couvertureFile != null && !couvertureFile.isEmpty()) {
+            // Delete old couverture file if exists
+            if (exist.getCouverture() != null) {
+                deleteFileIfExists(exist.getCouverture());
+            }
+
+            String coverFilename = id + "_cover_" + Instant.now().toEpochMilli() + "_" +
+                    Paths.get(couvertureFile.getOriginalFilename()).getFileName().toString();
+            Path target = eventDir.resolve(coverFilename);
+            try {
+                Files.copy(couvertureFile.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+                exist.setCouverture("/" + baseUploadDir + "/" + id + "/" + coverFilename);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to store couverture file", e);
+            }
+        }else {
+            if (exist.getCouverture() != null) {
+                deleteFileIfExists(exist.getCouverture());
+                exist.setCouverture(null);
+            }
+        }}
+
+        // --- 8) Update other images ---
+        if (images != null && !images.isEmpty()) {
+            // Optionally clear existing images
+            if (clearExistingImages != null && clearExistingImages) {
+                if (exist.getImageIds() != null) {
+                    for (String imageId : exist.getImageIds()) {
+                        imageRepository.findById(imageId).ifPresent(img -> {
+                            deleteFileIfExists(img.getUrl());
+                            imageRepository.deleteById(imageId);
+                        });
+                    }
+                }
+                exist.setImageIds(new ArrayList<>());
+            } else {
+                // Keep existing images
+                if (exist.getImageIds() == null) {
+                    exist.setImageIds(new ArrayList<>());
+                }
+            }
+
+            // Add new images
+            List<String> imageIds = new ArrayList<>(exist.getImageIds());
+            for (MultipartFile file : images) {
+                if (file == null || file.isEmpty()) continue;
+
+                String original = Paths.get(file.getOriginalFilename()).getFileName().toString();
+                String filename = id + "_" + Instant.now().toEpochMilli() + "_" + original;
+                Path target = eventDir.resolve(filename);
+
+                try {
+                    Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+
+                    Image image = new Image();
+                    image.setUrl("/" + baseUploadDir + "/" + id + "/" + filename);
+                    image.setEventId(id);
+                    image.setDescription(null);
+
+                    Image savedImage = imageRepository.save(image);
+                    imageIds.add(savedImage.getId());
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to store file " + original, e);
+                }
+            }
+            exist.setImageIds(imageIds);
+        }
+
+        // --- 9) Final save ---
         return eventRepository.save(exist);
+    }
+
+    // Helper method to delete files
+    private void deleteFileIfExists(String urlPath) {
+        if (urlPath == null || urlPath.isEmpty()) return;
+
+        try {
+            // Remove leading slash if present
+            String relativePath = urlPath.startsWith("/") ? urlPath.substring(1) : urlPath;
+            Path filePath = Paths.get(relativePath);
+            Files.deleteIfExists(filePath);
+        } catch (IOException e) {
+            // Log warning but don't throw - file might already be deleted
+            System.err.println("Could not delete file: " + urlPath + " - " + e.getMessage());
+        }
     }
 
     public void deleteEvent(String id) {
@@ -269,6 +419,29 @@ public class EventService {
                 eventRepository.save(e);
             }
         }
+    }
+    public ResponseEntity<Void> deleteEventImage(String eventId,String imageId) {
+        // Find the image
+        Image image = imageRepository.findById(imageId)
+                .orElseThrow(() -> new IllegalArgumentException("Image not found"));
+
+        // Verify it belongs to this event
+        if (!image.getEventId().equals(eventId)) {
+            throw new IllegalArgumentException("Image does not belong to this event");
+        }
+
+        // Delete the file
+        deleteFileIfExists(image.getUrl());
+
+        // Delete from database
+        imageRepository.deleteById(imageId);
+
+        // Remove from event's imageIds list
+        Event event = eventRepository.findById(eventId).orElseThrow();
+        event.getImageIds().remove(imageId);
+        eventRepository.save(event);
+
+        return ResponseEntity.noContent().build();
     }
 
     public List<Event> getArchivedEvents() {

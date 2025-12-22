@@ -8,6 +8,7 @@ import com.SmartEvent.SmartEvent.Service.EventService;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -52,14 +53,19 @@ public class EventController {
      * ✅ Update event
      * Example: PUT /api/events/{id}
      */
-    @PutMapping("/{id}")
-    public ResponseEntity<?> updateEvent(@PathVariable String id, @RequestBody Event event) {
-        try {
-            Event updated = eventService.updateEvent(id, event);
-            return ResponseEntity.ok(updated);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Event> updateEvent(
+            @PathVariable String id,
+            @RequestPart("event") @Valid Event event,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images,
+            @RequestPart(value = "logo", required = false) MultipartFile logo,
+            @RequestPart(value = "couverture", required = false) MultipartFile couverture,
+            @RequestParam(value = "logoChanged",required = false, defaultValue = "false") Boolean logChanged,
+            @RequestParam(value = "convertureChanged",required = false, defaultValue = "false") Boolean convertureChanged,
+            @RequestParam(value = "clearExistingImages", required = false, defaultValue = "false") Boolean clearExistingImages) {
+
+        Event updated = eventService.updateEventWithImages(id, event, images, logo, couverture, clearExistingImages,logChanged,convertureChanged);
+        return ResponseEntity.ok(updated);
     }
 
     /**
@@ -119,5 +125,12 @@ public class EventController {
     @GetMapping("/archived")
     public ResponseEntity<List<Event>> getArchivedEvents() {
         return ResponseEntity.ok(eventService.getArchivedEvents());
+    }
+    @DeleteMapping("/{eventId}/images/{imageId}")
+    public ResponseEntity<Void> deleteEventImage(
+            @PathVariable String eventId,
+            @PathVariable String imageId) {
+
+        return eventService.deleteEventImage(eventId, imageId);
     }
 }

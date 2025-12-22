@@ -85,10 +85,7 @@ public class AuthService {
         }
     }
     public ResponseEntity<Map> forgotPassword(String email) {
-        User user = userRepository.findByEmail(email);
-        if (user == null) {
-            throw new IllegalArgumentException("Email not found!");
-        }
+        User user = userRepository.findByEmail(email).orElseThrow(()->new IllegalArgumentException("email not found!"));
 
         // Generate 6-digit code
         String code = String.format("%06d", new Random().nextInt(9999));

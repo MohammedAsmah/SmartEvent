@@ -1,46 +1,37 @@
 package com.SmartEvent.SmartEvent.Model;
 
+import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 @Document(collection = "invites")
-public class Invite  {
+@Data
+public class Invite {
 
     @Id
     private String id;
 
-    @NotBlank
+    @NotNull
     private String eventId;
 
-    @Email
-    @NotBlank
-    private String email;
+    @NotNull
+    private String personId;
+
+    @NotNull
+    private Invitation invitation;
 
     private boolean confirmed = false;
 
-    // ----- Constructors -----
     public Invite() {}
 
-    public Invite(String id, String eventId, String email, boolean confirmed) {
-        this.id = id;
+    public Invite(String eventId, String personId, Invitation invitation, boolean confirmed) {
         this.eventId = eventId;
-        this.email = email;
+        this.personId = personId;
+        this.invitation = invitation;
         this.confirmed = confirmed;
     }
-
-    // ----- Getters & Setters -----
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-
-    public String getEventId() { return eventId; }
-    public void setEventId(String eventId) { this.eventId = eventId; }
-
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-
-    public boolean isConfirmed() { return confirmed; }
-    public void setConfirmed(boolean confirmed) { this.confirmed = confirmed; }
 }

@@ -19,7 +19,7 @@ import java.util.List;
 
 @NoArgsConstructor
  @Data
-@Document(collection = "users")
+@Document (collection = "user")
 public class User extends Person implements UserDetails {
     @NotBlank(message = "password is requered")
     @Size(min = 8, max = 20, message = "Password must be between 8 and 20 characters")
