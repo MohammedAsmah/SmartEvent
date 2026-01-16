@@ -28,10 +28,9 @@ public class Invite {
 
     public Invite() {}
 
-    public Invite(String eventId, String personId, Invitation invitation, boolean confirmed) {
+    public Invite(String eventId, String personId, boolean confirmed) {
         this.eventId = eventId;
         this.personId = personId;
-        this.invitation = invitation;
         this.confirmed = confirmed;
     }
 }

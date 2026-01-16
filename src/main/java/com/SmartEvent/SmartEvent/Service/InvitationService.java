@@ -80,7 +80,7 @@ public class InvitationService {
 
         if (!existingInvite.isPresent()) {
             // Create a new invite if one doesn't exist
-            inviteRepository.save(new Invite(event.getId(), invite.get_id(), invitation, false));
+            inviteRepository.save(new Invite(event.getId(), invite.get_id(), false));
         }
 
 

@@ -134,8 +134,8 @@ public class AuthService {
     }
     public TokenResponseDto refreshToken(String refreshToken,String token) {
         String tk = token.substring(7);
-        String username = jwtUtil.extractUsername(tk);
-        User user = userRepository.findByUsername(jwtUtil.extractUsername(tk));
+        String username = jwtUtil.extractUsername(refreshToken);
+        User user = userRepository.findByUsername(jwtUtil.extractUsername(refreshToken));
         Token storedToken=tokenRepository.findByUsername(username).orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.UNAUTHORIZED,
                 "Invalid or expired token"
